@@ -56,22 +56,22 @@ UKF::UKF() {
   is_initialized_ = false;
 
   // predicted sigma points matrix
-  Xsig_pred_;
+  Xsig_pred_ = MatrixXd(n_x_, n_x_);
 
   // time when the state is true, in us
   time_us_ = 0.;
 
   // Weights of sigma points
-  weights_;
+  weights_ = VectorXd(5);
 
   // State dimension
-  n_x_;
+  n_x_ = 3;
 
   // Augmented state dimension
-  n_aug_;
+  n_aug_ = 7;
 
   // Sigma point spreading parameter
-  lambda_;
+  lambda_ = 3;
 }
 
 UKF::~UKF() {}
@@ -88,19 +88,42 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   measurements.
   */
 
+  if (!is_initialized_) {
 
+    // Initialize the state x_ with the first measurement.
+    cout << "UKF: " << endl;
 
+    //initialize the timestamp_
+    time_us_ = meas_package.timestamp_;
 
+    //check the which measurement type is being passed (LASER preffered)
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
 
+      //initialize state
+      x_ << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0., 0., 0.;
+    }
+    else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
 
+      // Convert radar from polar to cartesian coordinates and initialize state.
+      float ro     = meas_package.raw_measurements_[0];
+      float phi    = meas_package.raw_measurements_[1];
+      float ro_dot = meas_package.raw_measurements_[2];
+      float x = ro * cos(phi);
+      float y = ro * sin(phi);
+      float vx = ro_dot * cos(phi);
+      float vy = ro_dot * sin(phi);
+      float v = sqrt(vx*vx+vy*vy);
 
+      // Initialize state.
+      x_ << x, y, v, 0., 0.;
+    } else {
 
+      cout << "Error!: No sensor type mentioned!" << endl;
+    }
+    // done initializing, no need to predict or update
+    is_initialized_ = true;
+  }
 
-
-
-
-
-  
 }
 
 /**
