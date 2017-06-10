@@ -24,9 +24,11 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
+  // 0.2 is used in the lesson
   std_a_ = 30;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
+  // 0.2 is used in the lesson
   std_yawdd_ = 30;
 
   // Laser measurement noise standard deviation position1 in m
@@ -65,13 +67,13 @@ UKF::UKF() {
   weights_ = VectorXd(5);
 
   // State dimension
-  n_x_ = 3;
+  n_x_ = 5;
 
   // Augmented state dimension
   n_aug_ = 7;
 
   // Sigma point spreading parameter
-  lambda_ = 3;
+  lambda_ = 3 - n_x_;
 }
 
 UKF::~UKF() {}
@@ -95,6 +97,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
     //initialize the timestamp_
     time_us_ = meas_package.timestamp_;
+    cout << time_us_;
 
     //check the which measurement type is being passed (LASER preffered)
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
@@ -138,6 +141,74 @@ void UKF::Prediction(double delta_t) {
   Complete this function! Estimate the object's location. Modify the state
   vector, x_. Predict sigma points, the state, and the state covariance matrix.
   */
+
+  //create sigma point matrix
+  MatrixXd Xsig = MatrixXd(n_x, 2 * n_x + 1);
+
+  //calculate square root of P
+  MatrixXd A = P.llt().matrixL();
+
+  //set first column of sigma point matrix
+  Xsig.col(0)  = x_;
+
+  //set remaining sigma points
+  for (int i = 0; i < n_x_; i++)
+  {
+    Xsig.col(i+1)     = x + sqrt(lambda_+n_x_) * A.col(i);
+    Xsig.col(i+1+n_x) = x - sqrt(lambda_+n_x_) * A.col(i);
+  }
+
+  //create augmented mean vector
+  VectorXd x_aug = VectorXd(n_aug_);
+
+  //create augmented state covariance
+  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
+
+  //create sigma point matrix
+  MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
+
+  //create augmented mean state
+  x_aug.head(n_x_) = x_;
+  x_aug(n_x_) = 0.;
+  x_aug(n_x_+1) = 0.;
+
+  //create augmented covariance matrix
+  P_aug.fill(0.);
+  P_aug.topLeftCorner(n_x_,n_x_) = P;
+  P_aug(n_x_,n_x_) = std_a_*std_a_;
+  P_aug(n_x_+1,n_x_+1) = std_yawdd_*std_yawdd_;
+
+  //create square root matrix
+  MatrixXd L = P_aug.llt().matrixL();
+
+  //create augmented sigma points
+  Xsig_aug.col(0)  = x_aug;
+  for (int i = 0; i< n_aug_; i++)
+  {
+    Xsig_aug.col(i+1)       = x_aug + sqrt(lambda_+n_aug_) * L.col(i);
+    Xsig_aug.col(i+1+n_aug) = x_aug - sqrt(lambda_+n_aug_) * L.col(i);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 /**
