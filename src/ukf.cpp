@@ -12,7 +12,7 @@ using std::vector;
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = true;
+  use_laser_ = false;
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
@@ -72,7 +72,7 @@ UKF::UKF() {
 
   // Sigma point spreading parameter
   lambda_ = 3 - n_x_;
-  
+
   // predicted sigma points matrix
   Xsig_pred_ = MatrixXd(n_x_, 2*n_aug_+1);
 
@@ -99,27 +99,22 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     P_ << 1., 0., 0., 0., 0.,
           0., 1., 0., 0., 0.,
           0., 0., 1., 0., 0.,
-          0., 0., 0., 10000., 0.,
-          0., 0., 0., 0., 10000.;
-
-    // double weight_0 = lambda_/(lambda_+n_aug_);
-    // weights_(0) = weight_0;
-    // for (int i=1; i<2*n_aug_+1; i++) {  //2n+1 weights
-    //   double weight = 0.5/(n_aug_+lambda_);
-    //   weights_(i) = weight;
-    // }
+          0., 0., 0., 0.1, 0.,
+          0., 0., 0., 0., 0.1;
 
     // Initialize the state x_ with the first measurement.
 
     //initialize the timestamp_
-    cout << "timestamp_: " << meas_package.timestamp_ << endl;
+    // cout << "timestamp_: " << meas_package.timestamp_ << endl;
     time_us_ = meas_package.timestamp_;
 
     //check the which measurement type is being passed (LASER preffered)
-    if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
 
       //initialize state
       x_ << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0., 0., 0.;
+      // done initializing, no need to predict or update
+      is_initialized_ = true;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
 
@@ -135,24 +130,27 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
       // Initialize state.
       x_ << x, y, v, 0., 0.;
+      // done initializing, no need to predict or update
+      is_initialized_ = true;
     } else {
 
       cout << "Error!: No sensor type mentioned!" << endl;
     }
 
-    // done initializing, no need to predict or update
-    is_initialized_ = true;
+
+    cout << is_initialized_ << endl;
   } else {
 
     // Go for a Prediction
     float dt = (meas_package.timestamp_ - time_us_)/1000000.0;
     Prediction(dt);
+    time_us_ = meas_package.timestamp_;
 
     // Go for the Update
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
 
       UpdateLidar(meas_package);
-    } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
 
       UpdateRadar(meas_package);
     }
@@ -177,11 +175,6 @@ void UKF::Prediction(double delta_t) {
 
 
   //Sigma point Generation
-  // debugging check
-  if (debugging_){
-    cout << "Prediction " << counter <<  endl;
-    counter += 1;
-  }
 
   //create sigma point matrix
   MatrixXd Xsig = MatrixXd(n_x_, 2 * n_x_ + 1);
@@ -203,11 +196,6 @@ void UKF::Prediction(double delta_t) {
 
 
   // Augmenation
-  // debugging check
-  if (debugging_){
-    cout << "Prediction " << counter <<  endl;
-    counter += 1;
-  }
 
   //create augmented mean vector
   VectorXd x_aug = VectorXd(n_aug_);
@@ -243,11 +231,6 @@ void UKF::Prediction(double delta_t) {
 
 
   // sigma point Prediction
-  // debugging check
-  if (debugging_){
-    cout << "Prediction " << counter <<  endl;
-    counter += 1;
-  }
 
   //predict sigma points
   for (int i = 0; i< 2*n_aug_+1; i++){
@@ -260,73 +243,34 @@ void UKF::Prediction(double delta_t) {
     double yawd = Xsig_aug(4,i);
     double nu_a = Xsig_aug(5,i);
     double nu_yawdd = Xsig_aug(6,i);
-    // debugging check
-    if (debugging_){
-      cout << "Prediction " << counter <<  endl;
-      counter += 1;
-    }
 
 
     //predicted state values
     double px_p, py_p;
-    // debugging check
-    if (debugging_){
-      cout << "Prediction " << counter <<  endl;
-      counter += 1;
-    }
-
 
     //avoid division by zero
     if (fabs(yawd) > 0.001) {
+
         px_p = p_x + v/yawd * ( sin (yaw + yawd*delta_t) - sin(yaw));
         py_p = p_y + v/yawd * ( cos(yaw) - cos(yaw+yawd*delta_t) );
-        // debugging check
-        if (debugging_){
-          cout << "Prediction " << counter <<  endl;
-          counter += 1;
-        }
-
     }
     else {
+
         px_p = p_x + v*delta_t*cos(yaw);
         py_p = p_y + v*delta_t*sin(yaw);
-        // debugging check
-        if (debugging_){
-          cout << "Prediction " << counter <<  endl;
-          counter += 1;
-        }
-
     }
 
     double v_p = v;
     double yaw_p = yaw + yawd*delta_t;
     double yawd_p = yawd;
-    // debugging check
-    if (debugging_){
-      cout << "Prediction " << counter <<  endl;
-      counter += 1;
-    }
-
 
     //add noise
     px_p = px_p + 0.5*nu_a*delta_t*delta_t * cos(yaw);
     py_p = py_p + 0.5*nu_a*delta_t*delta_t * sin(yaw);
     v_p = v_p + nu_a*delta_t;
-    // debugging check
-    if (debugging_){
-      cout << "Prediction " << counter <<  endl;
-      counter += 1;
-    }
-
 
     yaw_p = yaw_p + 0.5*nu_yawdd*delta_t*delta_t;
     yawd_p = yawd_p + nu_yawdd*delta_t;
-    // debugging check
-    if (debugging_){
-      cout << "Prediction " << counter <<  endl;
-      counter += 1;
-    }
-
 
     //write predicted sigma point into right column
     Xsig_pred_(0,i) = px_p;
@@ -334,22 +278,11 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(2,i) = v_p;
     Xsig_pred_(3,i) = yaw_p;
     Xsig_pred_(4,i) = yawd_p;
-    // debugging check
-    if (debugging_){
-      cout << "Prediction " << counter <<  endl;
-      counter += 1;
-    }
-
   }
 
 
 
   // mean and covariance Prediction
-  // debugging check
-  if (debugging_){
-    cout << "Prediction " << counter <<  endl;
-    counter += 1;
-  }
 
   // set weights
   double weight_0 = lambda_/(lambda_+n_aug_);
@@ -417,11 +350,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   int counter = 1;
 
   // radar measurement Prediction
-  // debugging check
-  if (debugging_){
-    cout << "UpdateRadar " << counter <<  endl;
-    counter += 1;
-  }
 
   //set measurement dimension, radar can measure r, phi, and r_dot
   int n_z = 3;
@@ -476,11 +404,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
 
   //radar update
-  // debugging check
-  if (debugging_){
-    cout << "UpdateRadar " << counter <<  endl;
-    counter += 1;
-  }
 
   //create matrix for cross correlation Tc
   MatrixXd Tc = MatrixXd(n_x_, n_z);
