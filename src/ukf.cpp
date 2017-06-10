@@ -60,14 +60,9 @@ UKF::UKF() {
   // initially set to false, set to true in first call of ProcessMeasurement
   is_initialized_ = false;
 
-  // predicted sigma points matrix
-  Xsig_pred_ = MatrixXd(n_x_, n_x_);
 
   // time when the state is true, in us
   time_us_ = 0.;
-
-  // Weights of sigma points
-  weights_ = VectorXd(5);
 
   // State dimension
   n_x_ = 5;
@@ -77,6 +72,12 @@ UKF::UKF() {
 
   // Sigma point spreading parameter
   lambda_ = 3 - n_x_;
+  
+  // predicted sigma points matrix
+  Xsig_pred_ = MatrixXd(n_x_, 2*n_aug_+1);
+
+  // Weights of sigma points
+  weights_ = VectorXd(2*n_aug_+1);
 }
 
 UKF::~UKF() {}
@@ -94,6 +95,19 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   */
 
   if (!is_initialized_) {
+
+    P_ << 1., 0., 0., 0., 0.,
+          0., 1., 0., 0., 0.,
+          0., 0., 1., 0., 0.,
+          0., 0., 0., 10000., 0.,
+          0., 0., 0., 0., 10000.;
+
+    // double weight_0 = lambda_/(lambda_+n_aug_);
+    // weights_(0) = weight_0;
+    // for (int i=1; i<2*n_aug_+1; i++) {  //2n+1 weights
+    //   double weight = 0.5/(n_aug_+lambda_);
+    //   weights_(i) = weight;
+    // }
 
     // Initialize the state x_ with the first measurement.
 
@@ -128,20 +142,20 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
     // done initializing, no need to predict or update
     is_initialized_ = true;
-  }
+  } else {
 
+    // Go for a Prediction
+    float dt = (meas_package.timestamp_ - time_us_)/1000000.0;
+    Prediction(dt);
 
-  // Go for a Prediction
-  float dt = (meas_package.timestamp_ - time_us_)/1000000.0;
-  Prediction(dt);
+    // Go for the Update
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
 
-  // Go for the Update
-  if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+      UpdateLidar(meas_package);
+    } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
 
-    UpdateLidar(meas_package);
-  } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
-
-    UpdateRadar(meas_package);
+      UpdateRadar(meas_package);
+    }
   }
 }
 
@@ -226,8 +240,6 @@ void UKF::Prediction(double delta_t) {
     Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_+n_aug_) * L.col(i);
   }
 
-  cout << delta_t;
-
 
 
   // sigma point Prediction
@@ -236,6 +248,7 @@ void UKF::Prediction(double delta_t) {
     cout << "Prediction " << counter <<  endl;
     counter += 1;
   }
+
   //predict sigma points
   for (int i = 0; i< 2*n_aug_+1; i++){
 
@@ -247,31 +260,73 @@ void UKF::Prediction(double delta_t) {
     double yawd = Xsig_aug(4,i);
     double nu_a = Xsig_aug(5,i);
     double nu_yawdd = Xsig_aug(6,i);
+    // debugging check
+    if (debugging_){
+      cout << "Prediction " << counter <<  endl;
+      counter += 1;
+    }
+
 
     //predicted state values
     double px_p, py_p;
+    // debugging check
+    if (debugging_){
+      cout << "Prediction " << counter <<  endl;
+      counter += 1;
+    }
+
 
     //avoid division by zero
     if (fabs(yawd) > 0.001) {
         px_p = p_x + v/yawd * ( sin (yaw + yawd*delta_t) - sin(yaw));
         py_p = p_y + v/yawd * ( cos(yaw) - cos(yaw+yawd*delta_t) );
+        // debugging check
+        if (debugging_){
+          cout << "Prediction " << counter <<  endl;
+          counter += 1;
+        }
+
     }
     else {
         px_p = p_x + v*delta_t*cos(yaw);
         py_p = p_y + v*delta_t*sin(yaw);
+        // debugging check
+        if (debugging_){
+          cout << "Prediction " << counter <<  endl;
+          counter += 1;
+        }
+
     }
 
     double v_p = v;
     double yaw_p = yaw + yawd*delta_t;
     double yawd_p = yawd;
+    // debugging check
+    if (debugging_){
+      cout << "Prediction " << counter <<  endl;
+      counter += 1;
+    }
+
 
     //add noise
     px_p = px_p + 0.5*nu_a*delta_t*delta_t * cos(yaw);
     py_p = py_p + 0.5*nu_a*delta_t*delta_t * sin(yaw);
     v_p = v_p + nu_a*delta_t;
+    // debugging check
+    if (debugging_){
+      cout << "Prediction " << counter <<  endl;
+      counter += 1;
+    }
+
 
     yaw_p = yaw_p + 0.5*nu_yawdd*delta_t*delta_t;
     yawd_p = yawd_p + nu_yawdd*delta_t;
+    // debugging check
+    if (debugging_){
+      cout << "Prediction " << counter <<  endl;
+      counter += 1;
+    }
+
 
     //write predicted sigma point into right column
     Xsig_pred_(0,i) = px_p;
@@ -279,6 +334,12 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(2,i) = v_p;
     Xsig_pred_(3,i) = yaw_p;
     Xsig_pred_(4,i) = yawd_p;
+    // debugging check
+    if (debugging_){
+      cout << "Prediction " << counter <<  endl;
+      counter += 1;
+    }
+
   }
 
 
@@ -297,7 +358,6 @@ void UKF::Prediction(double delta_t) {
     double weight = 0.5/(n_aug_+lambda_);
     weights_(i) = weight;
   }
-  cout << weights_;
 
   //predicted state mean
   x_.fill(0.0);
@@ -318,14 +378,6 @@ void UKF::Prediction(double delta_t) {
 
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose() ;
   }
-
-
-
-
-
-
-
-
 
 
 
