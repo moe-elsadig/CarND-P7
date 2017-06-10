@@ -51,6 +51,27 @@ UKF::UKF() {
 
   Hint: one or more values initialized above might be wildly off...
   */
+
+  // initially set to false, set to true in first call of ProcessMeasurement
+  is_initialized_ = false;
+
+  // predicted sigma points matrix
+  Xsig_pred_;
+
+  // time when the state is true, in us
+  time_us_ = 0.;
+
+  // Weights of sigma points
+  weights_;
+
+  // State dimension
+  n_x_;
+
+  // Augmented state dimension
+  n_aug_;
+
+  // Sigma point spreading parameter
+  lambda_;
 }
 
 UKF::~UKF() {}
@@ -66,6 +87,20 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 }
 
 /**
