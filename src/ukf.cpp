@@ -25,11 +25,11 @@ UKF::UKF() {
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   // 0.2 is used in the lesson
-  std_a_ = 0.2;
+  std_a_ = 0.5;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   // 0.2 is used in the lesson
-  std_yawdd_ = 0.2;
+  std_yawdd_ = 0.5;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -77,6 +77,11 @@ UKF::UKF() {
 
   // Weights of sigma points
   weights_ = VectorXd(2*n_aug_+1);
+
+  //NIS values
+  NIS_laser_ = 0.0;
+  NIS_radar_ = 0.0;
+
 }
 
 UKF::~UKF() {}
@@ -146,9 +151,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
 
       UpdateLidar(meas_package);
+      // cout << "L NIS: " << NIS_radar_ << endl;
     } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
 
       UpdateRadar(meas_package);
+      // cout << "R NIS: " << NIS_radar_ << endl;
     }
   }
 }
@@ -421,6 +428,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
   while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
 
+  //calculate NIS
+  NIS_laser_ = z_diff.transpose() * S.inverse() * z_diff;
+
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
@@ -540,11 +550,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
   while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
 
+  //calculate NIS
+  NIS_radar_ = z_diff.transpose() * S.inverse() * z_diff;
+
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
-
-
-
-
 }
